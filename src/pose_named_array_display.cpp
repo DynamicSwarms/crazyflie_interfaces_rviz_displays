@@ -36,7 +36,8 @@ PoseNamedArrayDisplay::PoseNamedArrayDisplay(
     context_ = display_context;
     scene_node_ = scene_node;
     scene_manager_ = context_->getSceneManager();
-
+    
+    clock_ = context_->getClock();
     arrows2d_ = std::make_unique<rviz_default_plugins::displays::FlatArrowsArray>(scene_manager_);
     arrows2d_->createAndAttachManualObject(scene_node);
     arrow_node_ = scene_node_->createChildSceneNode();
@@ -49,6 +50,13 @@ PoseNamedArrayDisplay::PoseNamedArrayDisplay(
 
 void PoseNamedArrayDisplay::initializeProperties() 
 {
+    pose_timeout_property_ = new rviz_common::properties::FloatProperty(
+        "Pose Timeout",
+        10.0,
+        "Time in seconds after which a pose is considered outdated and not shown anymore.",
+        this);
+    pose_timeout_property_->setMin(1.0);
+
     rotation_validity_property_ = new rviz_common::properties::BoolProperty(
         "Show Rotation Validity",
         true,
@@ -74,6 +82,8 @@ void PoseNamedArrayDisplay::initializeProperties()
 void PoseNamedArrayDisplay::onInitialize()
 {
   MFDClass::onInitialize();
+
+  clock_ = context_->getClock();
   arrows2d_ = std::make_unique<rviz_default_plugins::displays::FlatArrowsArray>(scene_manager_);
   arrows2d_->createAndAttachManualObject(scene_node_);
   arrow_node_ = scene_node_->createChildSceneNode();
@@ -122,10 +132,89 @@ bool PoseNamedArrayDisplay::setTransform(std_msgs::msg::Header const & header)
     return true;
 }
 
+inline double computeAlpha(double age_seconds, double pose_timeout)
+{
+    return std::clamp(
+        (1.0 - (age_seconds / pose_timeout)) / 0.7,
+        0.0,
+        1.0
+    );
+}
+
+void PoseNamedArrayDisplay::update(std::chrono::nanoseconds wall_dt, std::chrono::nanoseconds ros_dt) {
+    (void)wall_dt;
+    (void)ros_dt;
+    rclcpp::Time now = clock_->now();
+    double pose_timeout = pose_timeout_property_->getFloat();
+    rclcpp::Time timeout_threshold = now - rclcpp::Duration::from_seconds(pose_timeout);
+
+    for (auto it = poses_map_.begin(); it != poses_map_.end(); ) {
+        if (it->second.last_update_time < timeout_threshold) {
+            it = poses_map_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    for (auto & name_text_pair : name_texts_) {
+        const std::string & name = name_text_pair.first;
+
+        auto pose_it = poses_map_.find(name);
+
+        if (pose_it == poses_map_.end()) {
+            name_text_pair.second.second->setVisible(false);
+        } else {
+            Ogre::Vector3 position = rviz_common::pointMsgToOgre(pose_it->second.pose_named.pose.position);
+            name_text_pair.second.second->setPosition(position);    
+            name_text_pair.second.second->setVisible(show_names_property_->getBool());
+            name_text_pair.second.first->setColor(Ogre::ColourValue(1.0, 1.0, 1.0, computeAlpha((now - pose_it->second.last_update_time).seconds(), pose_timeout)));
+        }
+    }
+
+    
+    poses_.clear();
+    poses_alphas_.clear();
+    invalid_rotation_poses_.clear();
+    invalid_rotation_poses_alphas_.clear();
+    
+    poses_.reserve(poses_map_.size());
+    poses_alphas_.reserve(poses_map_.size());
+    invalid_rotation_poses_.reserve(poses_map_.size());
+    invalid_rotation_poses_alphas_.reserve(poses_map_.size());
+
+    bool separate_invalid = rotation_validity_property_->getBool();
+
+    for (const auto& [name, pose_msg] : poses_map_) {
+
+        auto & pose_named = pose_msg.pose_named;
+        auto & last_update_time = pose_msg.last_update_time;
+        auto& target =
+            (pose_named.rotation_valid || !separate_invalid)
+            ? poses_
+            : invalid_rotation_poses_;
+        auto& pose_alpha = 
+            (pose_named.rotation_valid || !separate_invalid)
+            ? poses_alphas_ 
+            : invalid_rotation_poses_alphas_;
+
+        pose_alpha.push_back(computeAlpha((now - last_update_time).seconds(), pose_timeout));
+        auto& pose = target.emplace_back();
+
+        pose.position =
+            rviz_common::pointMsgToOgre(pose_named.pose.position);
+
+        pose.orientation =
+            rviz_common::quaternionMsgToOgre(pose_named.pose.orientation);
+    } 
+    updateDisplay();
+
+    // context_->queueRender();
+}
+
 void PoseNamedArrayDisplay::updateDisplay()
 {
+
   int shape = shape_property_->getOptionInt();
-  bool show_names = show_names_property_->getBool();
   switch (shape) {
     case ShapeType::Arrow2d:
       updateArrows2d();
@@ -168,6 +257,7 @@ void PoseNamedArrayDisplay::updateArrows3d()
     for (std::size_t i = 0; i < poses_.size(); ++i) {
         arrows3d_[i]->setPosition(poses_[i].position);
         arrows3d_[i]->setOrientation(poses_[i].orientation * adjust_orientation);
+        arrows3d_[i]->setColor(1.0, 0.0, 0.0, poses_alphas_[i]);
     }
 }
 
@@ -182,6 +272,7 @@ void PoseNamedArrayDisplay::updateAxes()
   for (std::size_t i = 0; i < poses_.size(); ++i) {
     axes_[i]->setPosition(poses_[i].position);
     axes_[i]->setOrientation(poses_[i].orientation);
+    axes_[i]->setColor(1.0, 0.0, 0.0, poses_alphas_[i]);
   }
 }
 
@@ -196,6 +287,7 @@ void PoseNamedArrayDisplay::updatePoints()
 
     for (std::size_t i = 0; i < invalid_rotation_poses_.size(); ++i) {
         points_[i]->setPosition(invalid_rotation_poses_[i].position);
+        points_[i]->setColor(1.0, 0.0, 0.0, invalid_rotation_poses_alphas_[i]);
     }
 }
 
@@ -265,6 +357,7 @@ void PoseNamedArrayDisplay::processMessage(const crazyflie_interfaces::msg::Pose
     if (!setTransform(msg->header))
         return;
 
+    // Create a text object for each pose we have never seen before.
     for (auto & pose : msg->poses)
     {
         std::string name = pose.name;
@@ -277,58 +370,10 @@ void PoseNamedArrayDisplay::processMessage(const crazyflie_interfaces::msg::Pose
         }
     }
 
-    for (auto & name_text_pair : name_texts_) {
-        const std::string & name = name_text_pair.first;
-
-        auto it = std::find_if(
-            msg->poses.begin(),
-            msg->poses.end(),
-            [&name](const crazyflie_interfaces::msg::PoseNamed & p)
-            {
-                return p.name == name;
-            });
-
-        if (it == msg->poses.end()) {
-                name_text_pair.second.second->setVisible(false);
-        } else {
-            Ogre::Vector3 position = rviz_common::pointMsgToOgre(it->pose.position);
-            name_text_pair.second.second->setPosition(position);    
-            name_text_pair.second.second->setVisible(show_names_property_->getBool());
-        }
+    rclcpp::Time time_stamp = clock_->now();
+    for (const auto & pose : msg->poses) {
+        poses_map_[pose.name] = {pose, time_stamp};
     }
-
-    
-    int nbr_valid_rotations = 0;
-    int nbr_invalid_rotations = 0;
-    bool seperate_invalid_rotations = rotation_validity_property_->getBool();
-
-    for (std::size_t i = 0; i < msg->poses.size(); ++i) {
-        if (msg->poses[i].rotation_valid || !seperate_invalid_rotations) {
-            nbr_valid_rotations++;
-        } else {
-            nbr_invalid_rotations++;
-        }
-    }
-    poses_.resize(nbr_valid_rotations);
-    invalid_rotation_poses_.resize(nbr_invalid_rotations);
-
-
-    int valid_index = 0;
-    int invalid_index = 0;
-    for (std::size_t i = 0; i < msg->poses.size(); ++i) {
-        if (msg->poses[i].rotation_valid || !seperate_invalid_rotations) {
-            poses_[valid_index].position = rviz_common::pointMsgToOgre(msg->poses[i].pose.position);
-            poses_[valid_index].orientation = rviz_common::quaternionMsgToOgre(msg->poses[i].pose.orientation);
-            valid_index++;
-        } else {
-            invalid_rotation_poses_[invalid_index].position = rviz_common::pointMsgToOgre(msg->poses[i].pose.position);
-            invalid_rotation_poses_[invalid_index].orientation = rviz_common::quaternionMsgToOgre(msg->poses[i].pose.orientation);
-            invalid_index++;
-        }
-    }
-
-    updateDisplay();
-    context_->queueRender();
 }
 } // namespace crazyflie_interfaces_rviz_displays
 
