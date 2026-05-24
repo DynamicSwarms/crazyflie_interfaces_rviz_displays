@@ -27,13 +27,13 @@ namespace crazyflie_interfaces_rviz_displays
         rclcpp::Time last_update_time;
     };
 
-    class PoseNamedArrayDisplay 
+    class PoseNamedArray 
         : public rviz_common::MessageFilterDisplay<crazyflie_interfaces::msg::PoseNamedArray>
     {
         Q_OBJECT
     public:
-        PoseNamedArrayDisplay();
-        PoseNamedArrayDisplay(
+        PoseNamedArray();
+        PoseNamedArray(
             rviz_common::DisplayContext * display_context, 
             Ogre::SceneNode * scene_node
         );

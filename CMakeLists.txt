@@ -15,18 +15,18 @@ find_package(crazyflie_interfaces REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 qt6_wrap_cpp(MOC_FILES
-  include/crazyflie_interfaces_rviz_displays/pose_named_array_display.hpp
+  include/crazyflie_interfaces_rviz_displays/pose_named_array.hpp
 )
 
-add_library(pose_named_array_display
-  src/pose_named_array_display.cpp
+add_library(pose_named_array
+  src/pose_named_array.cpp
   ${MOC_FILES}
 )
 
-target_include_directories(pose_named_array_display PUBLIC
+target_include_directories(pose_named_array PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_link_libraries(pose_named_array_display PUBLIC
+target_link_libraries(pose_named_array PUBLIC
   pluginlib::pluginlib
   rviz_common::rviz_common
   rviz_rendering::rviz_rendering
@@ -34,8 +34,8 @@ target_link_libraries(pose_named_array_display PUBLIC
   crazyflie_interfaces::crazyflie_interfaces
 )
 
-install(TARGETS pose_named_array_display
-  EXPORT export_pose_named_array_display
+install(TARGETS pose_named_array
+  EXPORT export_pose_named_array
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -49,11 +49,16 @@ install(FILES rviz_common_plugins.xml
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(FILES icons/classes/PoseNamedArray.png
+        DESTINATION share/${PROJECT_NAME}/icons/classes
+)
+
+
 ament_export_include_directories(
   include
 )
 
-ament_export_targets(export_pose_named_array_display)
+ament_export_targets(export_pose_named_array)
 pluginlib_export_plugin_description_file(rviz_common rviz_common_plugins.xml)
 
 if(BUILD_TESTING)

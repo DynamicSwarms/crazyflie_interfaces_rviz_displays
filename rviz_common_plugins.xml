@@ -1,7 +1,6 @@
-<library path="pose_named_array_display">
-    <class type="crazyflie_interfaces_rviz_displays::PoseNamedArrayDisplay" base_class_type="rviz_common::Display">
-        <description>
-            Displays an array of named poses.
-        </description>
+<library path="pose_named_array">
+    <class type="crazyflie_interfaces_rviz_displays::PoseNamedArray" base_class_type="rviz_common::Display">
+        <description>Displays an array of named poses.</description>
+        <message_type>crazyflie_interfaces/msg/PoseNamedArray</message_type>
     </class>
 </library>

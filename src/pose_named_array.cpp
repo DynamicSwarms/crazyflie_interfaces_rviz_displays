@@ -1,4 +1,4 @@
-#include "crazyflie_interfaces_rviz_displays/pose_named_array_display.hpp"
+#include "crazyflie_interfaces_rviz_displays/pose_named_array.hpp"
 #include <rviz_common/logging.hpp>
 #include "rviz_common/validate_floats.hpp"
 #include "rviz_common/msg_conversions.hpp"
@@ -20,7 +20,7 @@ struct ShapeType
   };
 };
 
-PoseNamedArrayDisplay::PoseNamedArrayDisplay()
+PoseNamedArray::PoseNamedArray()
 {
     initializeProperties();
     shape_property_->addOption("Arrow (Flat)", ShapeType::Arrow2d);
@@ -28,10 +28,10 @@ PoseNamedArrayDisplay::PoseNamedArrayDisplay()
     shape_property_->addOption("Axes", ShapeType::Axes); 
 }
 
-PoseNamedArrayDisplay::PoseNamedArrayDisplay(
+PoseNamedArray::PoseNamedArray(
     rviz_common::DisplayContext * display_context, 
     Ogre::SceneNode * scene_node)
-    : PoseNamedArrayDisplay() 
+    : PoseNamedArray() 
 {
     context_ = display_context;
     scene_node_ = scene_node;
@@ -48,7 +48,7 @@ PoseNamedArrayDisplay::PoseNamedArrayDisplay(
     updateShapeChoice();
 }
 
-void PoseNamedArrayDisplay::initializeProperties() 
+void PoseNamedArray::initializeProperties() 
 {
     pose_timeout_property_ = new rviz_common::properties::FloatProperty(
         "Pose Timeout",
@@ -79,7 +79,7 @@ void PoseNamedArrayDisplay::initializeProperties()
     );
 }
 
-void PoseNamedArrayDisplay::onInitialize()
+void PoseNamedArray::onInitialize()
 {
   MFDClass::onInitialize();
 
@@ -92,7 +92,7 @@ void PoseNamedArrayDisplay::onInitialize()
   point_node_ = scene_node_->createChildSceneNode();
   updateShapeChoice();
 }
-void PoseNamedArrayDisplay::onEnable()
+void PoseNamedArray::onEnable()
 {
     MFDClass::onEnable();
     names_node_->setVisible(show_names_property_->getBool());
@@ -101,7 +101,7 @@ void PoseNamedArrayDisplay::onEnable()
     point_node_->setVisible(true);
 }
 
-void PoseNamedArrayDisplay::onDisable()
+void PoseNamedArray::onDisable()
 {
     MFDClass::onDisable();
     names_node_->setVisible(false);
@@ -110,7 +110,7 @@ void PoseNamedArrayDisplay::onDisable()
     point_node_->setVisible(false);
 }
 
-bool PoseNamedArrayDisplay::validateFloats(const crazyflie_interfaces::msg::PoseNamedArray & msg) 
+bool PoseNamedArray::validateFloats(const crazyflie_interfaces::msg::PoseNamedArray & msg) 
 {
     for (const auto & pose : msg.poses) {
         if (!rviz_common::validateFloats(pose.pose)) {
@@ -120,7 +120,7 @@ bool PoseNamedArrayDisplay::validateFloats(const crazyflie_interfaces::msg::Pose
     return true;
 }
 
-bool PoseNamedArrayDisplay::setTransform(std_msgs::msg::Header const & header) 
+bool PoseNamedArray::setTransform(std_msgs::msg::Header const & header) 
 {
     rclcpp::Time time_stamp(header.stamp, RCL_ROS_TIME);
     if (!updateFrame(header.frame_id, time_stamp)) {
@@ -141,7 +141,7 @@ inline double computeAlpha(double age_seconds, double pose_timeout)
     );
 }
 
-void PoseNamedArrayDisplay::update(std::chrono::nanoseconds wall_dt, std::chrono::nanoseconds ros_dt) {
+void PoseNamedArray::update(std::chrono::nanoseconds wall_dt, std::chrono::nanoseconds ros_dt) {
     (void)wall_dt;
     (void)ros_dt;
     rclcpp::Time now = clock_->now();
@@ -211,7 +211,7 @@ void PoseNamedArrayDisplay::update(std::chrono::nanoseconds wall_dt, std::chrono
     // context_->queueRender();
 }
 
-void PoseNamedArrayDisplay::updateDisplay()
+void PoseNamedArray::updateDisplay()
 {
 
   int shape = shape_property_->getOptionInt();
@@ -235,7 +235,7 @@ void PoseNamedArrayDisplay::updateDisplay()
   updatePoints();
 }
 
-void PoseNamedArrayDisplay::updateArrows2d()
+void PoseNamedArray::updateArrows2d()
 {
   arrows2d_->updateManualObject(
     Ogre::ColourValue(1.0, 0.0, 0.0, 1.0),
@@ -244,7 +244,7 @@ void PoseNamedArrayDisplay::updateArrows2d()
     poses_);
 }
 
-void PoseNamedArrayDisplay::updateArrows3d()
+void PoseNamedArray::updateArrows3d()
 {
     while (arrows3d_.size() < poses_.size()) {
         arrows3d_.push_back(makeArrow3d());
@@ -261,7 +261,7 @@ void PoseNamedArrayDisplay::updateArrows3d()
     }
 }
 
-void PoseNamedArrayDisplay::updateAxes()
+void PoseNamedArray::updateAxes()
 {
   while (axes_.size() < poses_.size()) {
     axes_.push_back(makeAxes());
@@ -276,7 +276,7 @@ void PoseNamedArrayDisplay::updateAxes()
   }
 }
 
-void PoseNamedArrayDisplay::updatePoints()
+void PoseNamedArray::updatePoints()
 {
     while (points_.size() < invalid_rotation_poses_.size()) {
         points_.push_back(makeSphere());
@@ -292,7 +292,7 @@ void PoseNamedArrayDisplay::updatePoints()
 }
 
 
-std::unique_ptr<rviz_rendering::Arrow> PoseNamedArrayDisplay::makeArrow3d()
+std::unique_ptr<rviz_rendering::Arrow> PoseNamedArray::makeArrow3d()
 {
   Ogre::ColourValue color = Ogre::ColourValue::Red;
 
@@ -309,7 +309,7 @@ std::unique_ptr<rviz_rendering::Arrow> PoseNamedArrayDisplay::makeArrow3d()
   return arrow;
 }
 
-std::unique_ptr<rviz_rendering::Axes> PoseNamedArrayDisplay::makeAxes()
+std::unique_ptr<rviz_rendering::Axes> PoseNamedArray::makeAxes()
 {
   return std::make_unique<rviz_rendering::Axes>(
     scene_manager_,
@@ -319,7 +319,7 @@ std::unique_ptr<rviz_rendering::Axes> PoseNamedArrayDisplay::makeAxes()
   );
 }
 
-std::unique_ptr<rviz_rendering::Shape> PoseNamedArrayDisplay::makeSphere()
+std::unique_ptr<rviz_rendering::Shape> PoseNamedArray::makeSphere()
 {
     auto sphere =  std::make_unique<rviz_rendering::Shape>(
         rviz_rendering::Shape::Sphere,
@@ -332,19 +332,19 @@ std::unique_ptr<rviz_rendering::Shape> PoseNamedArrayDisplay::makeSphere()
 }
 
 
-void PoseNamedArrayDisplay::updateShapeChoice()
+void PoseNamedArray::updateShapeChoice()
 {
   if (initialized()) {
     updateDisplay();
   }
 }
 
-void PoseNamedArrayDisplay::updateShowNames()
+void PoseNamedArray::updateShowNames()
 {
     names_node_->setVisible(show_names_property_->getBool());
 }
 
-void PoseNamedArrayDisplay::processMessage(const crazyflie_interfaces::msg::PoseNamedArray::ConstSharedPtr msg)
+void PoseNamedArray::processMessage(const crazyflie_interfaces::msg::PoseNamedArray::ConstSharedPtr msg)
 {
     if (!validateFloats(*msg)) {
         setStatus(
@@ -380,6 +380,6 @@ void PoseNamedArrayDisplay::processMessage(const crazyflie_interfaces::msg::Pose
 
 #include <pluginlib/class_list_macros.hpp>
 PLUGINLIB_EXPORT_CLASS(
-    crazyflie_interfaces_rviz_displays::PoseNamedArrayDisplay,
+    crazyflie_interfaces_rviz_displays::PoseNamedArray,
     rviz_common::Display
 )
