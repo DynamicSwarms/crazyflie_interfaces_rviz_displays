@@ -70,6 +70,13 @@ void PoseNamedArray::initializeProperties()
         this, 
         SLOT(updateShowNames()));
 
+    show_shapes_property_ = new rviz_common::properties::BoolProperty(
+        "Show Shapes", 
+        true,
+        "Whether to show the shapes representing the poses in RViz.",
+        this, 
+        SLOT(updateShowShapes()));
+
     shape_property_ = new rviz_common::properties::EnumProperty(
         "Shape", 
         "Arrow (Flat)",
@@ -96,9 +103,9 @@ void PoseNamedArray::onEnable()
 {
     MFDClass::onEnable();
     names_node_->setVisible(show_names_property_->getBool());
-    arrow_node_->setVisible(true);
-    axes_node_->setVisible(true);
-    point_node_->setVisible(true);
+    arrow_node_->setVisible(show_shapes_property_->getBool());
+    axes_node_->setVisible(show_shapes_property_->getBool());
+    point_node_->setVisible(show_shapes_property_->getBool());
 }
 
 void PoseNamedArray::onDisable()
@@ -213,6 +220,12 @@ void PoseNamedArray::update(std::chrono::nanoseconds wall_dt, std::chrono::nanos
 
 void PoseNamedArray::updateDisplay()
 {
+    if (!show_shapes_property_->getBool()) {
+        arrows2d_->clear();
+        arrows3d_.clear();
+        axes_.clear();
+        return;
+    }
 
   int shape = shape_property_->getOptionInt();
   switch (shape) {
@@ -232,6 +245,7 @@ void PoseNamedArray::updateDisplay()
       arrows3d_.clear();
       break;
   }
+
   updatePoints();
 }
 
@@ -339,9 +353,22 @@ void PoseNamedArray::updateShapeChoice()
   }
 }
 
+void PoseNamedArray::updateShowShapes()
+{
+    arrow_node_->setVisible(show_shapes_property_->getBool());
+    axes_node_->setVisible(show_shapes_property_->getBool());
+    point_node_->setVisible(show_shapes_property_->getBool());
+    if (initialized()) {
+        updateDisplay();
+    }
+}
+
 void PoseNamedArray::updateShowNames()
 {
     names_node_->setVisible(show_names_property_->getBool());
+    if (initialized()) {
+        updateDisplay();
+    }
 }
 
 void PoseNamedArray::processMessage(const crazyflie_interfaces::msg::PoseNamedArray::ConstSharedPtr msg)

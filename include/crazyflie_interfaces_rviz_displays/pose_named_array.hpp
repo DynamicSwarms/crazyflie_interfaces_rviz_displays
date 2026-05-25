@@ -61,6 +61,7 @@ namespace crazyflie_interfaces_rviz_displays
 
     private Q_SLOTS:
         void updateShapeChoice();
+        void updateShowShapes();
         void updateShowNames();
     private:
         std::shared_ptr<rclcpp::Clock> clock_;
@@ -68,6 +69,7 @@ namespace crazyflie_interfaces_rviz_displays
         rviz_common::properties::FloatProperty * pose_timeout_property_;
         rviz_common::properties::BoolProperty * rotation_validity_property_;
         rviz_common::properties::BoolProperty * show_names_property_;
+        rviz_common::properties::BoolProperty * show_shapes_property_;
         rviz_common::properties::EnumProperty * shape_property_;
         
 
